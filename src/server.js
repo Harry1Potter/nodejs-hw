@@ -3,6 +3,7 @@ import cors from 'cors';
 import notesRoutes from "./routes/notesRoutes.js";
 import helmet from 'helmet';
 import 'dotenv/config';
+import { errors } from 'celebrate';
 import { connectMongoDB } from './db/connectMongoDB.js';
 import { notFoundHandler } from './middleware/notFoundHandler.js';
 import { errorHandler } from './middleware/errorHandler.js';
@@ -26,7 +27,7 @@ app.use((req, res, next) => {
 app.use(notesRoutes);
 
 app.use(notFoundHandler);
-
+app.use(errors());
 app.use(errorHandler);
 
 await connectMongoDB();
