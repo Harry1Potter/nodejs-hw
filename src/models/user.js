@@ -1,10 +1,15 @@
 import mongoose from 'mongoose';
 
-const userSchema = mongoose.Schema({
-  username: { type: String, trim: true },
-  email: { type: String, unique: true, required: true, trim: true },
-  password: { type: String, required: true, minlength: 8 },
-});
+const userSchema = mongoose.Schema(
+  {
+    username: { type: String, trim: true },
+    email: { type: String, unique: true, required: true, trim: true },
+    password: { type: String, required: true, minlength: 8 },
+  },
+  {
+    timestamps: true,
+  }
+);
 
 userSchema.pre('save', function () {
   if (!this.username) {

@@ -18,6 +18,7 @@ export const registerUser = async (req, res) => {
   const newSession = await createSession(newUser._id);
 
   setSessionCookies(res, newSession);
+  res.status(201).json(newUser);
 };
 
 export const loginUser = async (req, res) => {
@@ -30,7 +31,7 @@ export const loginUser = async (req, res) => {
   if (!isValidPassword) {
     throw createHttpError(401, 'Invalid credentials');
   }
-
+  await Session.deleteMany({ userId: user._id });
   const newSession = await createSession(user._id);
   setSessionCookies(res, newSession);
 
