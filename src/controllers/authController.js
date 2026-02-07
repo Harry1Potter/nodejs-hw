@@ -1,6 +1,9 @@
+import fs from 'node:fs/promises';
+import path from 'node:path';
 import { User } from '../models/user.js';
 import createHttpError from 'http-errors';
 import bcrypt from 'bcrypt';
+import handlebars from 'handlebars';
 import jwt from 'jsonwebtoken';
 import { createSession, setSessionCookies } from '../services/auth.js';
 import { Session } from '../models/session.js';
@@ -81,7 +84,9 @@ export const requestResetEmail = async (req, res) => {
 
   const user = await User.findOne({ email });
   if (!user) {
-    res.status(200).json({ message: 'Password reset email sent successfully' });
+    return res
+      .status(200)
+      .json({ message: 'Password reset email sent successfully' });
   }
 
   const resetToken = jwt.sign(
@@ -90,16 +95,25 @@ export const requestResetEmail = async (req, res) => {
     { expiresIn: '15m' },
   );
 
-  console.log(resetToken);
+  const resetLink = `${process.env.FRONTEND_DOMAIN}/reset-password?token=${resetToken}`;
 
-  const frontendUrl = `https://stackblitzstarters9z9rfg4g-1yc1--3000--31fc58ec.local-credentialless.webcontainer.io/reset-pwd?token=${resetToken}`;
+  const templatePath = path.resolve(
+    'src/templates/reset-password-email.html',
+  );
+  const templateSource = await fs.readFile(templatePath, 'utf-8');
+  const template = handlebars.compile(templateSource);
+
+  const html = template({
+    username: user.username ?? 'there',
+    resetLink,
+  });
 
   try {
     await sendEmail({
       from: process.env.SMTP_FROM,
       to: email,
-      subject: 'Reset password link',
-      html: `<p>Click this <a href="${frontendUrl}">link</a> to reset password</p>`,
+      subject: 'Reset password',
+      html,
     });
   } catch {
     throw createHttpError(
@@ -108,7 +122,9 @@ export const requestResetEmail = async (req, res) => {
     );
   }
 
-  res.status(200).json({ message: 'Email sent!' });
+  res.status(200).json({
+    message: 'Password reset email sent successfully',
+  });
 };
 
 export const resetPassword = async (req, res) => {
