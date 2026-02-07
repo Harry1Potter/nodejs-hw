@@ -1,8 +1,10 @@
 import { User } from '../models/user.js';
 import createHttpError from 'http-errors';
 import bcrypt from 'bcrypt';
+import jwt from 'jsonwebtoken';
 import { createSession, setSessionCookies } from '../services/auth.js';
 import { Session } from '../models/session.js';
+import { sendEmail } from '../utils/sendMail.js';
 
 export const registerUser = async (req, res) => {
   const { email, password } = req.body;
@@ -71,5 +73,67 @@ export const refreshUserSession = async (req, res) => {
   setSessionCookies(res, newSession);
   res.status(200).json({
     message: 'Session refreshed',
+  });
+};
+
+export const requestResetEmail = async (req, res) => {
+  const { email } = req.body;
+
+  const user = await User.findOne({ email });
+  if (!user) {
+    res.status(200).json({ message: 'Password reset email sent successfully' });
+  }
+
+  const resetToken = jwt.sign(
+    { sub: user._id, email },
+    process.env.JWT_SECRET,
+    { expiresIn: '15m' },
+  );
+
+  console.log(resetToken);
+
+  const frontendUrl = `https://stackblitzstarters9z9rfg4g-1yc1--3000--31fc58ec.local-credentialless.webcontainer.io/reset-pwd?token=${resetToken}`;
+
+  try {
+    await sendEmail({
+      from: process.env.SMTP_FROM,
+      to: email,
+      subject: 'Reset password link',
+      html: `<p>Click this <a href="${frontendUrl}">link</a> to reset password</p>`,
+    });
+  } catch {
+    throw createHttpError(
+      500,
+      'Failed to send the email, please try again later.',
+    );
+  }
+
+  res.status(200).json({ message: 'Email sent!' });
+};
+
+export const resetPassword = async (req, res) => {
+  const { password, token } = req.body;
+  let payload;
+  try {
+    payload = jwt.verify(token, process.env.JWT_SECRET);
+  } catch {
+    throw createHttpError(401, 'Invalid or expired token');
+  }
+
+  const user = await User.findOne({ _id: payload.sub, email: payload.email });
+  if (!user) {
+    throw createHttpError(404, 'User not found');
+  }
+
+  const hashedPassword = await bcrypt.hash(password, 10);
+  await User.updateOne({ _id: payload.sub }, { password: hashedPassword });
+
+  await Session.deleteMany({ userId: user._id });
+  res.clearCookie('accessToken');
+  res.clearCookie('refreshToken');
+  res.clearCookie('sessionId');
+
+  res.status(200).json({
+    message: 'Password reset successfully',
   });
 };
